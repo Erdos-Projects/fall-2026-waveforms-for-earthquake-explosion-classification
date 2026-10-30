@@ -4,97 +4,150 @@
 
 ## Rows and labels
 
-One row per event. Each feature is measured at individual stations, then summarized by the median of the available finite values.
+One row represents one event. Each feature is calculated for individual station recordings, then summarized by the median of the available values.
 
 - `event_id`: event identifier for joining files.
-- `label`: **0** = earthquake (`eq`); **1** = explosion (`px/ex/qb`).
-- `geographic_fold`: marks one of five evaluation sets. Events in the same geographic group stay in the same set.
-- Each `__n_stations` column counts stations contributing a finite feature value.
+- `label`: **0** = earthquake; **1** = catalog-labeled explosion.
+- `geographic_fold`: one of five evaluation sets. Events in the same geographic group stay together.
+- Columns ending in `__n_stations` count the stations contributing to that feature.
 
-Each station recording contains about **150 seconds** at **100 samples per second** in three directions: **E** (east–west), **N** (north–south), and **Z** (vertical). **P** and **S** are the supplied P-wave and S-wave arrival times. A window is the portion of a recording used for a measurement.
+Each recording contains about **150 seconds** at **100 samples per second** in three directions: **E** (east–west), **N** (north–south), and **Z** (vertical).
 
-RMS measures typical amplitude. For $n$ signal samples $x_i$,
+**P** and **S** are the supplied arrival times. A **window** is the part of a recording used for a measurement.
 
-$$
-\operatorname{RMS}(x)=\sqrt{\frac{1}{n}\sum_{i=1}^{n}x_i^2}
-$$
+RMS measures typical amplitude. For n samples:
 
-## Waveform features
+```math
+\mathrm{RMS}(x)=\sqrt{\frac{1}{n}\sum_{i=1}^{n}x_i^2}
+```
 
-For the first five features, subtract each component’s mean over the entire recording. Then taper the first and last 5%: smoothly reduce amplitude toward zero at the ends, without removing samples.
+## Waveform preparation
 
-A bandpass filter retains a chosen frequency range. Each feature uses its specified filter separately; filters are not chained. Filters are fourth-order Butterworth, applied forward and backward.
+For the first five features, subtract each component's mean over the entire recording. Smoothly reduce the amplitude toward zero over the first and last 5%, without removing samples.
 
-### nb_log10_pz_sh_rms_ratio_4_8hz — P/S amplitude ratio
+Each feature uses its own frequency filter. The filters are not applied one after another. Bandpass filters are fourth-order Butterworth filters applied forward and backward.
 
-Compares vertical motion near P with horizontal motion near S. Horizontal amplitude is $H=\sqrt{E^2+N^2}$; subscripts identify the P or S window.
+## P/S amplitude ratio
 
-$$
-\text{log\_ps}=\log_{10}\!\left(\frac{\operatorname{RMS}(Z_P)}{\operatorname{RMS}(H_S)}\right)
-$$
+Column: `nb_log10_pz_sh_rms_ratio_4_8hz`
 
-Filter: **4–8 Hz**. P window: starts at P, duration **min(1.5 seconds, S−P)**, requiring at least 0.3 seconds. S window: **S to S+3 seconds**.
+Compares vertical motion near P with horizontal motion near S.
 
-### nb_log10_sh_sz_rms_ratio_4_8hz — S horizontal/vertical ratio
+```math
+R_{PS}=\log_{10}\left(\frac{\mathrm{RMS}(Z_P)}{\mathrm{RMS}(H_S)}\right)
+```
 
-Compares horizontal and vertical motion during S.
+Horizontal amplitude combines the east–west and north–south signals:
 
-$$
-\text{log\_hv\_s}=\log_{10}\!\left(\frac{\operatorname{RMS}(H_S)}{\operatorname{RMS}(Z_S)}\right)
-$$
+```math
+H=\sqrt{E^2+N^2}
+```
 
-Filter: **4–8 Hz**. Window: **S to S+3 seconds**.
+Subscripts P and S identify the measurement windows.
 
-### nb_envelope_rise_10_90_s_2_10hz — amplitude rise time
+- Filter: **4–8 Hz**.
+- P window: starts at P and ends after **1.5 seconds**, or at S if S arrives sooner. It must last at least **0.3 seconds**.
+- S window: **S to S+3 seconds**.
 
-Elapsed time between the first 10% and 90% crossings of the largest smoothed amplitude in the selected window. Search only up to the peak; use sample times without interpolation. The smoothed three-component amplitude is called the envelope.
+## S horizontal/vertical ratio
 
-$$
-\text{rise\_time}=t_{90\%}-t_{10\%}
-$$
+Column: `nb_log10_sh_sz_rms_ratio_4_8hz`
 
-Filter: **2–10 Hz**. Amplitude: $\sqrt{E^2+N^2+Z^2}$, smoothed with a **0.2-second moving average**. Window: **P−1 to S+10 seconds**.
+Compares horizontal and vertical motion during the S window.
 
-### nb_envelope_excess_kurtosis_2_10hz — envelope excess kurtosis
+```math
+R_{HV}=\log_{10}\left(\frac{\mathrm{RMS}(H_S)}{\mathrm{RMS}(Z_S)}\right)
+```
 
-Describes how extreme the smoothed amplitude values are relative to their usual variation. $e$ is the smoothed amplitude; $\bar e$ is its mean.
+- Filter: **4–8 Hz**.
+- Window: **S to S+3 seconds**.
 
-$$
-\text{env\_kurtosis}=
-\frac{\operatorname{mean}\!\left[(e-\bar e)^4\right]}
-{\left(\operatorname{mean}\!\left[(e-\bar e)^2\right]\right)^2}-3
-$$
+## Amplitude rise time
 
-Uses the rise-time filter, smoothing, and window; `scipy.stats.kurtosis(e)` defaults: `fisher=True, bias=True`.
+Column: `nb_envelope_rise_10_90_s_2_10hz`
 
-### nb_log10_psd_power_1_5_over_5_15hz — low/high frequency power ratio
+Measures the time between the first crossings of 10% and 90% of the largest smoothed amplitude, searching only up to that peak.
 
-Compares power in lower and higher frequency bands.
+```math
+T_{\mathrm{rise}}=t_{90}-t_{10}
+```
 
-$$
-\text{log\_lowhigh}=\log_{10}\!\left(\frac{\text{power}_{1\leq f\lt 5\,\mathrm{Hz}}}{\text{power}_{5\leq f\lt 15\,\mathrm{Hz}}}\right)
-$$
+Combine the three filtered components, then smooth the resulting amplitude with a **0.2-second moving average**. This smoothed signal is the envelope.
 
-Window: **P−1 to P+20 seconds**. No bandpass. Welch’s method estimates power per frequency using **2-second segments**. Sum the three component spectra, then integrate each band with the trapezoidal rule.
+```math
+A=\sqrt{E^2+N^2+Z^2}
+```
 
-### cb_crest_factor — peak relative to typical amplitude
+- Filter: **2–10 Hz**.
+- Window: **P−1 to S+10 seconds**.
+- Crossing times use the recorded sample times, without interpolation.
+- Units: **seconds**.
 
-Measures the largest absolute signal peak relative to RMS amplitude.
+## Envelope excess kurtosis
 
-$$
-\text{crest factor}=\frac{\max_i|x_i|}{\operatorname{RMS}(x)}
-$$
+Column: `nb_envelope_excess_kurtosis_2_10hz`
 
-Remove the fitted straight-line baseline from each entire component recording (linear detrending), then filter to **1–15 Hz**. Window: **P−5 to P+40 seconds**. Calculate per component, then take their median.
+Measures how extreme the envelope's values are relative to their usual variation. Here e is the envelope, and its mean is denoted by an overbar.
 
-### cb_spectral_entropy — spread of frequency power
+```math
+K_{\mathrm{excess}}=
+\frac{\mathrm{mean}\left[(e-\bar{e})^4\right]}
+{\left(\mathrm{mean}\left[(e-\bar{e})^2\right]\right)^2}-3
+```
 
-Measures how power is distributed across frequencies: lower values mean it is concentrated at fewer frequencies; higher values mean a more even spread. $Q_k$ is the spectral power value at frequency bin $k$, $K$ is the number of bins, and $p_k$ is its fraction of the total.
+Uses the same filter, smoothing, and window as rise time. Calculated with `scipy.stats.kurtosis(e, fisher=True, bias=True)`.
 
-$$
-p_k=\frac{Q_k}{\sum_{j=1}^{K}Q_j},
-\qquad
-\text{entropy}=-\frac{\sum_{k=1}^{K}p_k\ln\!\left(\max(p_k,10^{-15})\right)}{\ln K}
-$$
+## Low/high frequency power ratio
 
-Uses the same linear detrending and **1–15 Hz** filter as crest factor. Window: **P to P+40 seconds**. Welch segments: **4 seconds**; bins: **from 1 Hz up to but excluding 15 Hz**. Calculate per component, then take their median.
+Column: `nb_log10_psd_power_1_5_over_5_15hz`
+
+Compares power in a lower-frequency band with power in a higher-frequency band.
+
+```math
+R_{\mathrm{power}}=\log_{10}\left(\frac{P_{\mathrm{low}}}{P_{\mathrm{high}}}\right)
+```
+
+- Low band: **1 Hz up to, but excluding, 5 Hz**.
+- High band: **5 Hz up to, but excluding, 15 Hz**.
+- Window: **P−1 to P+20 seconds**.
+- No bandpass filter before spectral estimation.
+
+Welch's method estimates each component's power spectrum using **2-second segments**. Sum the three component spectra, then integrate each band with the trapezoidal rule.
+
+## Crest factor
+
+Column: `cb_crest_factor`
+
+Measures the largest absolute signal peak relative to its typical amplitude.
+
+```math
+C=\frac{\max_i |x_i|}{\mathrm{RMS}(x)}
+```
+
+Remove the fitted straight-line baseline from each entire component recording, then filter to **1–15 Hz**.
+
+- Window: **P−5 to P+40 seconds**.
+- Calculate separately for each component, then take their median.
+
+## Spectral entropy
+
+Column: `cb_spectral_entropy`
+
+Measures how evenly power is spread across frequencies. Lower values mean power is concentrated at fewer frequencies; higher values mean a more even spread.
+
+Let Q be the spectral power values, K the number of retained frequency bins, and p each bin's share of the total power.
+
+```math
+p_k=\frac{Q_k}{\sum_{j=1}^{K}Q_j}
+```
+
+```math
+H=-\frac{\sum_{k=1}^{K}p_k\ln\left(\max(p_k,10^{-15})\right)}{\ln K}
+```
+
+Uses the same baseline removal and **1–15 Hz** filter as crest factor.
+
+- Window: **P to P+40 seconds**.
+- Welch segments: **4 seconds**.
+- Retained frequencies: **1 Hz up to, but excluding, 15 Hz**.
+- Calculate separately for each component, then take their median.
