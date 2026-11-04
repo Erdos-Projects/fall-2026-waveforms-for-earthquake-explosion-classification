@@ -1,4 +1,4 @@
-# PNW corrected training CSV
+# PNW training CSV functions and definitions
 
 `pnw_training_corrected.csv`: **38,579 event rows**.
 
