@@ -1,0 +1,30 @@
+DATA FILE DESCRIPTIONS
+
+pnw_training_corrected.csv is the main dataset for modeling. The other files contain the original metadata and saved intermediate results used to recreate it.
+
+Files ending in .csv.gz are CSV files compressed with gzip to save space. Python's pandas.read_csv() can read them directly without unzipping them.
+
+
+comcat_metadata.csv.gz
+Original metadata from the PNW dataset, with one row per station recording. Includes event information, catalog labels, station details, P/S arrival picks, and recording-quality flags. It describes the recordings but does not contain the raw waveform samples.
+
+event_checkpoint.csv.gz
+An earlier event-level dataset. Supplies saved location, magnitude, depth, local-time features, crest factor, and spectral entropy. During preparation, its five older waveform-feature columns are replaced with corrected values.
+
+event_groups_and_folds.csv.gz
+Event IDs, labels, spatial groups, and saved geographic-fold assignments. Defines the reviewed set of events used by the preparation workflow, before the two final exclusions.
+
+excluded_events.csv.gz
+The two events removed at the final cleaning step, with the reasons for removal. Neither has valid measurements for the two amplitude features because its usable P-wave windows are shorter than 0.3 seconds. This is not a complete list of every event removed earlier in cleaning.
+
+pnw_training_corrected.csv
+The final cleaned dataset: 38,579 events and 22 columns, with one row per event. Contains the class label (0 = earthquake, 1 = catalog-labeled explosion), event information, model features, geographic fold, and station-support counts for the five corrected waveform features.
+
+recording_features.csv.gz
+The five corrected waveform measurements for individual recordings, plus identifiers and reasons for missing measurements. The preparation workflow selects the retained station recordings, then calculates each event's feature medians and the number of stations contributing to each feature.
+
+waveform_measurements.csv.gz
+Saved results from earlier waveform processing, including quality-control outcomes, crest factor, spectral entropy, and trace/checksum information. The current preparation workflow reads its source_row and status columns to identify recordings that passed waveform quality checks.
+
+
+The preparation workflow reuses these saved measurements and decisions. It does not download raw waveforms or recalculate every feature from scratch.
