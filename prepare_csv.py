@@ -13,7 +13,7 @@ def main():
     script_folder = Path(__file__).resolve().parent
     project_folder = script_folder.parent
     data_folder = project_folder / "data"
-    raw = pd.read_csv(data_folder / "comcat_metadata.csv", dtype={
+    raw = pd.read_csv(data_folder / "comcat_metadata.csv.gz", dtype={
         "event_id": "string", "station_network_code": "string", "station_code": "string",
     })
     labeled = clean_labels(raw)
