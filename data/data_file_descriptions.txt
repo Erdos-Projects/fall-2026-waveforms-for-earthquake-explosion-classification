@@ -25,6 +25,3 @@ The five corrected waveform measurements for individual recordings, plus identif
 
 waveform_measurements.csv.gz
 Saved results from earlier waveform processing, including quality-control outcomes, crest factor, spectral entropy, and trace/checksum information. The current preparation workflow reads its source_row and status columns to identify recordings that passed waveform quality checks.
-
-
-The preparation workflow reuses these saved measurements and decisions. It does not download raw waveforms or recalculate every feature from scratch.
